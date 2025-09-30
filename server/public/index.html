@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CLAY COTTAGE — Furniture & Décor</title>
+  <meta name="description" content="Agentforce CLAY COTTAGE: instant product help, order status, and style guidance for a multi-brand furniture retailer." />
+  <style>
+    :root{
+      --bg:#0b1220;--panel:#0f172a;--fg:#e6eefc;--muted:#9aa5b1;
+      --accent:#7c3aed;--accent-2:#22d3ee;--border:#1f2a40;
+      --bubble-user:#17233a;--bubble-agent:#0c1a2c;--radius:16px;
+      --shadow:0 14px 34px rgba(2,6,23,.45)
+    }
+    @media (prefers-color-scheme: light){
+      :root{--bg:#f6f8fc;--panel:#fff;--fg:#0f172a;--muted:#5b6470;--border:#e4e6eb;--bubble-user:#eef2ff;--bubble-agent:#f1f5f9;--shadow:0 8px 22px rgba(0,0,0,.08)}
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.18), transparent 40%),
+        radial-gradient(1000px 700px at -10% -10%, rgba(34,211,238,.14), transparent 40%),
+        var(--bg);
+      color:var(--fg);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial
+    }
+
+    /* === Floating Action Button (image) === */
+    .fab{
+      position:fixed; right:20px; bottom:20px; width:96px; height:96px;
+      border:0; padding:0; border-radius:50%;
+      background:radial-gradient(circle at 60% 40%, rgba(124,58,237,.25), rgba(34,211,238,.15));
+      box-shadow:var(--shadow); cursor:pointer; z-index:9998;
+      transition: transform .12s ease, filter .2s ease;
+    }
+    .fab:hover{ filter:brightness(1.06) }
+    .fab:active{ transform: translateY(1px) }
+    .fab img{ width:100%; height:100%; object-fit:contain; display:block; filter: drop-shadow(0 6px 12px rgba(0,0,0,.35)) }
+    /* Fallback if the image fails to load */
+    .fab.no-img{ display:grid; place-items:center; font-weight:800; color:#0f172a; background:radial-gradient(circle at 50% 45%, #22d3ee, #7c3aed) }
+    .fab.no-img::after{ content:"CLAY COTTAGE" }
+
+    /* === Floating chat window (snappy animation) === */
+    .chat-window{
+      position:fixed; right:20px; bottom:20px; width:min(840px,96vw); z-index:9999; /* wider */
+      transform: translateY(24px) scale(.98);
+      opacity: 0;
+      pointer-events:none;
+      transition:
+        transform .22s cubic-bezier(.2,.8,.2,1),
+        opacity .22s linear,
+        box-shadow .22s ease;
+      will-change: transform, opacity;
+    }
+    .chat-window.open{
+      transform: translateY(0) scale(1);
+      opacity: 1;
+      pointer-events:auto;
+    }
+
+    /* Card + chat layout */
+    .panel{ background:var(--panel); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow); overflow:clip }
+    .chat{ display:grid; grid-template-rows:auto 1fr auto; height:min(78vh,760px) } /* taller */
+    .chat-header{ display:grid; grid-template-columns:1fr auto; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--panel) }
+    .chat-title{ font-weight:700 }
+    .status{ font:12px/1.2 ui-monospace,monospace; color:var(--muted); margin-left:6px; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+    .icon-btn{ border:1px solid var(--border); background:transparent; color:var(--fg); border-radius:10px; padding:6px 10px; cursor:pointer }
+
+    .history{ padding:18px; overflow:auto; scroll-behavior:smooth }
+
+    /* Message rows now use FLEX so we can right/left align easily */
+    .row{ margin:12px 0; display:flex }
+    .agent{ justify-content:flex-start }
+    .user{ justify-content:flex-end }
+    .system{ justify-content:center }
+
+    .bubble{
+      border-radius:14px; padding:12px 14px;
+      /* Let bubbles be large & comfy: */
+      max-width:88%;
+      white-space:pre-wrap;
+      word-break: break-word;
+    }
+    .user .bubble{ background:var(--bubble-user) }
+    .agent .bubble{ background:var(--bubble-agent) }
+    .system .bubble{ color:var(--muted); border:1px dashed var(--border); background:transparent }
+
+    /* >>> Make BOTH user & agent bubbles a consistent readable width <<< */
+    .history .user .bubble,
+    .history .agent .bubble{
+      min-width: min(60%, 560px);    /* at least 60% of chat width, up to 560px */
+    }
+    @media (max-width: 900px){
+      .history .user .bubble,
+      .history .agent .bubble{ min-width: min(70%, 88%) }
+    }
+    @media (max-width: 640px){
+      .history .user .bubble,
+      .history .agent .bubble{ min-width: auto } /* small screens: let it shrink */
+    }
+
+    /* Bigger single-row composer: textarea + fixed-width buttons */
+    .composer{
+      display:grid;
+      grid-template-columns: minmax(0,1fr) 96px 88px 112px; /* input | Send | Stop | New chat */
+      gap:8px; padding:12px; border-top:1px solid var(--border); backdrop-filter:blur(6px)
+    }
+    .composer textarea{
+      resize:none; width:100%; border:1px solid var(--border); background:transparent; color:var(--fg);
+      padding:12px 14px; border-radius:var(--radius); min-height:96px; max-height:320px; outline:none; font-size:16px;
+    }
+    .composer textarea::placeholder{ color:var(--muted) }
+    .btn{
+      border:1px solid color-mix(in oklab, var(--accent) 60%, var(--border));
+      background:linear-gradient(135deg, color-mix(in oklab,var(--accent) 25%, transparent), color-mix(in oklab,var(--accent-2) 20%, transparent));
+      color:var(--fg); padding:10px 12px; border-radius:var(--radius); cursor:pointer; font-weight:600
+    }
+    .hidden{ display:none }
+  
+/* === Retail skin to resemble attachment === */
+:root{
+  --ink:#1f2937; --muted:#6b7280; --sand:#f7f3ef; --linen:#faf7f2;
+  --terracotta:#ea580c; --sage:#84a98c; --border:#e5e7eb;
+}
+body{ background:var(--linen); color:var(--ink); }
+.container{ max-width:1200px; margin:0 auto; padding:0 16px; }
+
+.utility{ background:#fff; border-bottom:1px solid var(--border); font-size:12px; color:var(--muted);}
+.utility__row{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
+
+.masthead{ background:#fff; border-bottom:1px solid var(--border); }
+.masthead__row{ display:grid; grid-template-columns: 1fr auto 1fr; gap:12px; align-items:center; padding:18px 0; }
+.mast-logo{ letter-spacing:0.5rem; font-family: Georgia, 'Times New Roman', serif; font-size:28px; text-align:center; }
+.mast-search input{ width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:999px; background:#fff; }
+.mast-icons{ display:flex; gap:16px; justify-content:flex-end; }
+.mast-icons a{ color:var(--ink); text-decoration:none; font-size:14px; }
+
+.primary-nav{ background:#fff; border-bottom:1px solid var(--border); }
+.primary-nav ul{ display:flex; gap:18px; list-style:none; margin:0; padding:12px 0; overflow:auto; }
+.primary-nav a{ text-decoration:none; color:var(--ink); font-size:14px; white-space:nowrap; }
+.primary-nav a.sale{ color:var(--terracotta); font-weight:600; }
+
+.promos{ background:#fff; border-bottom:1px solid var(--border); }
+.promos__row{ display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; padding:10px 0; font-size:13px; color:#374151; }
+@media (max-width:900px){ .promos__row{ grid-template-columns: 1fr 1fr; } }
+
+.hero{ position:relative; }
+.hero img{ width:100%; height:auto; display:block; }
+.hero__overlay{ position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:16px; padding:6vw; }
+.hero h1{ font-family: Georgia, 'Times New Roman', serif; font-size: clamp(32px, 6vw, 64px); font-weight:400; letter-spacing:.02em; }
+.btn{ padding:10px 16px; border-radius:999px; border:1px solid var(--ink); background:transparent; cursor:pointer; font-size:14px; }
+.btn--solid{ background:var(--ink); color:#fff; border-color:var(--ink); }
+.btn--ghost{ background:transparent; color:var(--ink); border-color:var(--ink); }
+
+/* Ensure chat FAB overlays above new header/hero */
+#chatFab{ z-index: 50; }
+#chatWindow{ z-index: 60; }
+
+
+/* Category grid */
+.category-grid{ background:#fff; padding:28px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.category-grid ul{ display:grid; gap:18px; list-style:none; margin:0; padding:0; grid-template-columns: repeat(8,1fr); }
+@media (max-width:1200px){ .category-grid ul{ grid-template-columns: repeat(4,1fr);} }
+@media (max-width:700px){ .category-grid ul{ grid-template-columns: repeat(2,1fr);} }
+.category-grid img{ width:100%; height:120px; object-fit:cover; border-radius:12px; border:1px solid var(--border); background:#f8fafc; }
+.category-grid li a{ display:flex; flex-direction:column; gap:10px; text-decoration:none; color:var(--ink); align-items:center; }
+.category-grid span{ font-size:14px; }
+
+/* Story band */
+.story-band{ background:var(--linen); padding:40px 0; }
+.story__row{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; }
+.story__card{ position:relative; overflow:hidden; border-radius:16px; background:#fff; border:1px solid var(--border); }
+.story__card img{ width:100%; height:340px; object-fit:cover; display:block; }
+.story__copy{ padding:18px; display:flex; flex-direction:column; gap:8px; }
+.story__copy h2{ font-family: Georgia, 'Times New Roman', serif; font-weight:400; }
+
+/* Feature grid */
+.features{ display:grid; grid-template-columns: repeat(3,1fr); gap:18px; padding:32px 0; }
+.feat{ background:#fff; border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+.feat img{ width:100%; height:220px; object-fit:cover; display:block; }
+.feat h3{ margin:14px 16px 6px; font-size:18px; }
+.feat p{ margin:0 16px 10px; color:var(--muted); font-size:14px; }
+.feat .link{ margin:0 16px 18px; display:inline-block; color:var(--ink); text-decoration:none; border-bottom:1px solid var(--ink); }
+
+/* Footer */
+.site-footer{ background:#fff; border-top:1px solid var(--border); margin-top:40px; }
+.footer__grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:18px; padding:28px 0; }
+.footer__grid h4{ margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:.08em; }
+.footer__grid ul{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+.footer__grid a{ color:var(--ink); text-decoration:none; font-size:14px; }
+.footer__legal{ border-top:1px solid var(--border); padding:12px 0; text-align:center; color:var(--muted); font-size:12px; }
+
+</style>
+
+    <!-- BEGIN SFDC WEB SDK (Data Cloud) -->
+    <!-- Paste the exact script snippet from Data Cloud > Websites & Mobile Apps here.
+         It will include one inline <script> with configuration and one external <script src="..."> to the CDN.
+         Example (DO NOT USE AS-IS):
+         <script>
+           window.sfdcInteractions = window.sfdcInteractions || function(){ (window.sfdcInteractions.q=window.sfdcInteractions.q||[]).push(arguments); };
+           window.sfdcInteractions('configure', { /* your org/site config */ });
+         </script>
+         <script async src="https://YOUR-ORG-CDN-PATH/web-sdk.js"></script>
+    -->
+    <!-- END SFDC WEB SDK (Data Cloud) -->
+  </head>
+<body>
+
+<header class="utility">
+  <div class="container utility__row">
+    <div class="util-left">Pottery & Décor Brands</div>
+    <div class="util-right">Earn rewards • Free design help • Store & Events</div>
+  </div>
+</header>
+
+<header class="masthead">
+  <div class="container masthead__row">
+    <div class="mast-search">
+      <input type="search" placeholder="Search" aria-label="Search products, rooms, advice" />
+    </div>
+    <div class="mast-logo">CLAY&nbsp;COTTAGE</div>
+    <nav class="mast-icons" aria-label="Account & tools">
+      <a href="#" aria-label="Account">Account</a>
+      <a href="#" aria-label="Track Order">Track Order</a>
+      <a href="#" aria-label="Recents">Recents</a>
+      <a href="#" aria-label="Favorites">Favorites</a>
+      <a href="#" aria-label="Cart">Cart (0)</a>
+    </nav>
+  </div>
+</header>
+
+<nav class="primary-nav" aria-label="Primary">
+  <div class="container">
+    <ul>
+      <li><a href="#">New</a></li>
+      <li><a href="#">Furniture</a></li>
+      <li><a href="#">Outdoor</a></li>
+      <li><a href="#">Bedding</a></li>
+      <li><a href="#">Bath</a></li>
+      <li><a href="#">Lighting</a></li>
+      <li><a href="#">Rugs</a></li>
+      <li><a href="#">Pillows & Decor</a></li>
+      <li><a href="#">Art & Mirrors</a></li>
+      <li><a href="#">Tabletop</a></li>
+      <li><a href="#">Storage</a></li>
+      <li><a href="#">Gifts</a></li>
+      <li><a href="#" class="sale">Sale</a></li>
+    </ul>
+  </div>
+</nav>
+
+<section class="promos" aria-label="Promotions">
+  <div class="container promos__row">
+    <div>Free Shipping on 1000s of Items</div>
+    <div>Up to 60% off Furniture, Bedding, Decor & More</div>
+    <div>In-Stock Furniture • 1–4 Week Delivery</div>
+    <div>Up to 50% off Halloween</div>
+  </div>
+</section>
+
+<section class="category-grid" aria-label="Shop by Category">
+  <div class="container">
+    <ul>
+      <li><a href="#"><img src="img/cat-furniture.png" alt=""><span>Furniture</span></a></li>
+      <li><a href="#"><img src="img/bedding.jpg" alt=""><span>Bedding</span></a></li>
+      <li><a href="#"><img src="img/cat-bath.png" alt=""><span>Bath</span></a></li>
+      <li><a href="#"><img src="img/cat-lighting.png" alt=""><span>Lighting</span></a></li>
+      <li><a href="#"><img src="img/cat-rugs.png" alt=""><span>Rugs</span></a></li>
+      <li><a href="#"><img src="img/cat-outdoor.png" alt=""><span>Outdoor</span></a></li>
+      <li><a href="#"><img src="img/cat-decor.png" alt=""><span>Pillows & Decor</span></a></li>
+      <li><a href="#"><img src="img/cat-gifts.png" alt=""><span>Gifts</span></a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="story-band" aria-label="Seasonal">
+  <div class="container story__row">
+    <div class="story__card">
+      <img src="img/story-holiday.png" alt="Holiday">
+      <div class="story__copy">
+        <h2>Holiday Preview</h2>
+        <p>Warm layers, welcoming tables, and gifting made easy.</p>
+        <button class="btn btn--solid">Shop Holiday</button>
+      </div>
+    </div>
+    <div class="story__card">
+      <img src="img/story-dining.png" alt="Dining">
+      <div class="story__copy">
+        <h2>Dining Room Refresh</h2>
+        <p>Gather in style with solid-wood tables and modern seating.</p>
+        <button class="btn btn--solid">Shop Dining</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="feature-grid" aria-label="Highlights">
+  <div class="container features">
+    <article class="feat">
+      <img src="img/feat-windows.png" alt="Windows">
+      <h3>Custom Window Solutions</h3>
+      <p>Light-filtering to blackout, made to fit your space.</p>
+      <a href="#" class="link">Explore Windows →</a>
+    </article>
+    <article class="feat">
+      <img src="img/feat-art.png" alt="Art">
+      <h3>Art & Mirrors</h3>
+      <p>Curated prints and handcrafted mirrors.</p>
+      <a href="#" class="link">Shop Wall Decor →</a>
+    </article>
+    <article class="feat">
+      <img src="img/feat-storage.png" alt="Storage">
+      <h3>Smart Storage</h3>
+      <p>Clutter-free living with beautiful organization.</p>
+      <a href="#" class="link">Get Organized →</a>
+    </article>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container footer__grid">
+    <div>
+      <h4>Customer Service</h4>
+      <ul>
+        <li><a href="#">Order Status</a></li>
+        <li><a href="#">Shipping & Returns</a></li>
+        <li><a href="#">Design Services</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>About</h4>
+      <ul>
+        <li><a href="#">Our Story</a></li>
+        <li><a href="#">Sustainability</a></li>
+        <li><a href="#">Careers</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Connect</h4>
+      <ul>
+        <li><a href="#">Stores & Events</a></li>
+        <li><a href="#">Email Signup</a></li>
+        <li><a href="#">Contact Us</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer__legal">
+    © CLAY COTTAGE — For demo only.
+  </div>
+</footer>
+
+
+<section class="hero">
+  <img src="img/hero-home-advisor.png" alt="" />
+  <div class="hero__overlay">
+    <h1>Dine in Style</h1>
+    <div class="hero__cta">
+      <button type="button" class="btn btn--solid">Dining Tables</button>
+      <button type="button" class="btn btn--ghost">Chairs</button>
+      <button type="button" class="btn btn--ghost">Sideboards</button>
+    </div>
+  </div>
+</section>
+
+
+
+  <!-- Floating Action Button -->
+  <button id="chatFab" class="fab" aria-label="Open CLAY COTTAGE chat">
+    <!-- Absolute path; fallback shows a gradient "CLAY COTTAGE" if image fails -->
+    <img src="/img/team9b.png" alt="Open CLAY COTTAGE" onerror="this.style.display='none'; this.parentElement.classList.add('no-img')" />
+  </button>
+
+  <!-- Floating chat window -->
+  <div id="chatWindow" class="chat-window" role="dialog" aria-modal="false" aria-label="CLAY COTTAGE chat window">
+    <section class="panel chat" aria-label="Chat panel">
+      <div class="chat-header">
+        <div>
+          <span class="chat-title">CLAY COTTAGE</span>
+          <span id="status" class="status">Session: idle</span>
+        </div>
+        <button id="chatClose" class="icon-btn" aria-label="Close chat">✕</button>
+      </div>
+
+      <div id="history" class="history" aria-live="polite" aria-atomic="false">
+        <div class="row system"><div class="bubble">Welcome to <b>CLAY COTTAGE</b>. Click the bot to start, then type a prompt.</div></div>
+      </div>
+
+      <div class="composer" role="form" aria-label="Prompt composer">
+        <textarea id="input" rows="1" placeholder="Ask CLAY COTTAGE anything… (Shift+Enter = newline)" aria-label="Prompt input"></textarea>
+        <button id="send" class="btn" type="button" aria-label="Send message" disabled>Send</button>
+        <!-- Stop & New Chat buttons are appended by app.js -->
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js?v=14"></script>
+  <script src="/sfdc-hooks.js"></script>
+</body>
+</html>

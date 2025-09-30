@@ -1,0 +1,52 @@
+[
+  {
+    "developerName": "eventId",
+    "displayName": "Event ID",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "dateTime",
+    "displayName": "Event Datetime",
+    "dataType": "DateTime"
+  },
+  {
+    "developerName": "deviceId",
+    "displayName": "Device ID",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "sessionId",
+    "displayName": "Session ID",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "sourceUrl",
+    "displayName": "Source URL",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "sourceUrlReferrer",
+    "displayName": "Referrer URL",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "sourceChannel",
+    "displayName": "Source Channel",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "eventName",
+    "displayName": "Event Name",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "userId",
+    "displayName": "Known User ID",
+    "dataType": "Text"
+  },
+  {
+    "developerName": "accountId",
+    "displayName": "Account ID",
+    "dataType": "Text"
+  }
+]

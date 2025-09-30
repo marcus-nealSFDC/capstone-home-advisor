@@ -1,0 +1,14 @@
+{
+  "name": "headless-agent",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon server/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.12.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0"
+  }
+}

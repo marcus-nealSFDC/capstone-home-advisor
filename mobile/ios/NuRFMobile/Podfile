@@ -1,0 +1,17 @@
+platform :ios, '17.0'
+use_frameworks!
+
+source 'https://github.com/forcedotcom/SalesforceMobileSDK-iOS-Specs.git'
+source 'https://cdn.cocoapods.org/'
+
+target 'YourApp' do
+  pod 'AgentforceSDK'
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |t|
+    t.build_configurations.each do |c|
+      c.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+    end
+  end
+end

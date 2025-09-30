@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NuRF – Floating Chat</title>
+  <meta name="description" content="NuRF floating chat with Salesforce Agent API streaming." />
+  <style>
+    :root{
+      --bg:#0b1220;--panel:#0f172a;--fg:#e6eefc;--muted:#9aa5b1;
+      --accent:#7c3aed;--accent-2:#22d3ee;--border:#1f2a40;
+      --bubble-user:#17233a;--bubble-agent:#0c1a2c;--radius:16px;
+      --shadow:0 14px 34px rgba(2,6,23,.45)
+    }
+    @media (prefers-color-scheme: light){
+      :root{--bg:#f6f8fc;--panel:#fff;--fg:#0f172a;--muted:#5b6470;--border:#e4e6eb;--bubble-user:#eef2ff;--bubble-agent:#f1f5f9;--shadow:0 8px 22px rgba(0,0,0,.08)}
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 800px at 70% -10%, rgba(124,58,237,.18), transparent 40%),
+        radial-gradient(1000px 700px at -10% -10%, rgba(34,211,238,.14), transparent 40%),
+        var(--bg);
+      color:var(--fg);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial
+    }
+
+    /* === Floating Action Button (image) === */
+    .fab{
+      position:fixed; right:20px; bottom:20px; width:96px; height:96px;
+      border:0; padding:0; border-radius:50%;
+      background:radial-gradient(circle at 60% 40%, rgba(124,58,237,.25), rgba(34,211,238,.15));
+      box-shadow:var(--shadow); cursor:pointer; z-index:9998;
+      transition: transform .12s ease, filter .2s ease;
+    }
+    .fab:hover{ filter:brightness(1.06) }
+    .fab:active{ transform: translateY(1px) }
+    .fab img{ width:100%; height:100%; object-fit:contain; display:block; filter: drop-shadow(0 6px 12px rgba(0,0,0,.35)) }
+    /* Fallback if the image fails to load */
+    .fab.no-img{ display:grid; place-items:center; font-weight:800; color:#0f172a; background:radial-gradient(circle at 50% 45%, #22d3ee, #7c3aed) }
+    .fab.no-img::after{ content:"NuRF" }
+
+    /* === Floating chat window (snappy animation) === */
+    .chat-window{
+      position:fixed; right:20px; bottom:20px; width:min(840px,96vw); z-index:9999; /* wider */
+      transform: translateY(24px) scale(.98);
+      opacity: 0;
+      pointer-events:none;
+      transition:
+        transform .22s cubic-bezier(.2,.8,.2,1),
+        opacity .22s linear,
+        box-shadow .22s ease;
+      will-change: transform, opacity;
+    }
+    .chat-window.open{
+      transform: translateY(0) scale(1);
+      opacity: 1;
+      pointer-events:auto;
+    }
+
+    /* Card + chat layout */
+    .panel{ background:var(--panel); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow); overflow:clip }
+    .chat{ display:grid; grid-template-rows:auto 1fr auto; height:min(78vh,760px) } /* taller */
+    .chat-header{ display:grid; grid-template-columns:1fr auto; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border); background:var(--panel) }
+    .chat-title{ font-weight:700 }
+    .status{ font:12px/1.2 ui-monospace,monospace; color:var(--muted); margin-left:6px; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+    .icon-btn{ border:1px solid var(--border); background:transparent; color:var(--fg); border-radius:10px; padding:6px 10px; cursor:pointer }
+
+    .history{ padding:18px; overflow:auto; scroll-behavior:smooth }
+
+    /* Message rows now use FLEX so we can right/left align easily */
+    .row{ margin:12px 0; display:flex }
+    .agent{ justify-content:flex-start }
+    .user{ justify-content:flex-end }
+    .system{ justify-content:center }
+
+    .bubble{
+      border-radius:14px; padding:12px 14px;
+      /* Let bubbles be large & comfy: */
+      max-width:88%;
+      white-space:pre-wrap;
+      word-break: break-word;
+    }
+    .user .bubble{ background:var(--bubble-user) }
+    .agent .bubble{ background:var(--bubble-agent) }
+    .system .bubble{ color:var(--muted); border:1px dashed var(--border); background:transparent }
+
+    /* >>> Make BOTH user & agent bubbles a consistent readable width <<< */
+    .history .user .bubble,
+    .history .agent .bubble{
+      min-width: min(60%, 560px);    /* at least 60% of chat width, up to 560px */
+    }
+    @media (max-width: 900px){
+      .history .user .bubble,
+      .history .agent .bubble{ min-width: min(70%, 88%) }
+    }
+    @media (max-width: 640px){
+      .history .user .bubble,
+      .history .agent .bubble{ min-width: auto } /* small screens: let it shrink */
+    }
+
+    /* Bigger single-row composer: textarea + fixed-width buttons */
+    .composer{
+      display:grid;
+      grid-template-columns: minmax(0,1fr) 96px 88px 112px; /* input | Send | Stop | New chat */
+      gap:8px; padding:12px; border-top:1px solid var(--border); backdrop-filter:blur(6px)
+    }
+    .composer textarea{
+      resize:none; width:100%; border:1px solid var(--border); background:transparent; color:var(--fg);
+      padding:12px 14px; border-radius:var(--radius); min-height:96px; max-height:320px; outline:none; font-size:16px;
+    }
+    .composer textarea::placeholder{ color:var(--muted) }
+    .btn{
+      border:1px solid color-mix(in oklab, var(--accent) 60%, var(--border));
+      background:linear-gradient(135deg, color-mix(in oklab,var(--accent) 25%, transparent), color-mix(in oklab,var(--accent-2) 20%, transparent));
+      color:var(--fg); padding:10px 12px; border-radius:var(--radius); cursor:pointer; font-weight:600
+    }
+    .hidden{ display:none }
+  </style>
+
+    <!-- BEGIN SFDC WEB SDK (Data Cloud) -->
+    <!-- Paste the exact script snippet from Data Cloud > Websites & Mobile Apps here.
+         It will include one inline <script> with configuration and one external <script src="..."> to the CDN.
+         Example (DO NOT USE AS-IS):
+         <script>
+           window.sfdcInteractions = window.sfdcInteractions || function(){ (window.sfdcInteractions.q=window.sfdcInteractions.q||[]).push(arguments); };
+           window.sfdcInteractions('configure', { /* your org/site config */ });
+         </script>
+         <script async src="https://YOUR-ORG-CDN-PATH/web-sdk.js"></script>
+    -->
+    <!-- END SFDC WEB SDK (Data Cloud) -->
+  </head>
+<body>
+
+  <!-- Floating Action Button -->
+  <button id="chatFab" class="fab" aria-label="Open NuRF chat">
+    <!-- Absolute path; fallback shows a gradient "NuRF" if image fails -->
+    <img src="/img/team9b.png" alt="Open NuRF" onerror="this.style.display='none'; this.parentElement.classList.add('no-img')" />
+  </button>
+
+  <!-- Floating chat window -->
+  <div id="chatWindow" class="chat-window" role="dialog" aria-modal="false" aria-label="NuRF chat window">
+    <section class="panel chat" aria-label="Chat panel">
+      <div class="chat-header">
+        <div>
+          <span class="chat-title">NuRF</span>
+          <span id="status" class="status">Session: idle</span>
+        </div>
+        <button id="chatClose" class="icon-btn" aria-label="Close chat">✕</button>
+      </div>
+
+      <div id="history" class="history" aria-live="polite" aria-atomic="false">
+        <div class="row system"><div class="bubble">Welcome to <b>NuRF</b>. Click the bot to start, then type a prompt.</div></div>
+      </div>
+
+      <div class="composer" role="form" aria-label="Prompt composer">
+        <textarea id="input" rows="1" placeholder="Ask NuRF anything… (Shift+Enter = newline)" aria-label="Prompt input"></textarea>
+        <button id="send" class="btn" type="button" aria-label="Send message" disabled>Send</button>
+        <!-- Stop & New Chat buttons are appended by app.js -->
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js?v=14"></script>
+  <script src="/sfdc-hooks.js"></script>
+</body>
+</html>
