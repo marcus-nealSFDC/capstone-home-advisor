@@ -68,7 +68,9 @@ async function startSession(){
     setReady(false);
     const r = await fetch('/api/session/start',{ method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
     if(!r.ok){ addMessage('system','Session error: '+await r.text()); return null; }
-    const j = await r.json();
+    const text = await r.text();
+    let j;
+    try { j = JSON.parse(text); } catch(e){ addMessage('system','Session error: non-JSON from /api/session/start'); return null; }
     sessionId=j.sessionId;
     sessionStarted=true;
     setReady(true,sessionId);
@@ -160,7 +162,6 @@ async function sendMessage(text, metadata){
 // ===== Welcome trigger =====
 async function sendWelcomeIfFirstTurn(){
   if(!sessionId) return;
-  // Do not echo this message as a user bubble; we want the welcome to look system/agent-originated.
   await sendMessage(WELCOME_TRIGGER, { channel: 'web', brand: 'Clay Cottage' });
 }
 
@@ -190,7 +191,6 @@ function openChat(){
     if(!sessionStarted){
       const sid = await startSession();
       if (sid) { 
-        // immediately ask the agent to send its welcome
         await sendWelcomeIfFirstTurn();
       }
     }
@@ -235,7 +235,6 @@ if(!document.getElementById('newchat')){
     sessionId=null;
     sessionStarted=false;
     setReady(false);
-    // keep minimal system line; real greeting will stream right after
     elHistory.innerHTML = '<div class="row system"><div class="bubble">Starting a new session…</div></div>';
     const sid = await startSession();
     if (sid) await sendWelcomeIfFirstTurn();
