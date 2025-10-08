@@ -59,7 +59,8 @@ function addMessage(role, text, partial){
 
 function setReady(ready, sid){
   elSend.disabled=!ready;
-  statusBadge.textContent = ready ? ('Session: ready'+(sid?' ['+sid+']':'')) : 'Session: starting...';
+  statusBadge.textContent = `Clay Cottage is online 🌿`;
+
 }
 
 // ===== Session controls =====
