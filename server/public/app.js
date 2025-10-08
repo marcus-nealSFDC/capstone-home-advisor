@@ -59,7 +59,7 @@ function addMessage(role, text, partial){
 
 function setReady(ready, sid){
   elSend.disabled=!ready;
-  statusBadge.textContent = `Clay Cottage is online 🌿`;
+  statusBadge.textContent = `Clay Cottage is online 🛋️`;
 
 }
 
